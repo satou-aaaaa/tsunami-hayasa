@@ -2028,21 +2028,32 @@ const PLAY_D = [1, 2, 3, 5, 7, 10, 15, 20, 30, 50, 70, 100, 150, 200, 300, 500, 
 function lab(i) {
   Core.screens.mark("lab"); // 「戻る」でホームへ
   if (!(i >= 0 && i < PLAY_D.length)) i = PLAY_D.indexOf(10);
-  const d = PLAY_D[i], v = G.kmh(d), slower = G.MOVERS.filter((m) => m.v * 1.1 < v), faster = G.MOVERS.filter((m) => m.v > v * 1.1), even = G.MOVERS.filter((m) => !slower.includes(m) && !faster.includes(m));
   app.innerHTML = `<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>深さを変えてくらべる<small>記録には入りません</small></h1></header>
-    <div class="ad act"><div class="sky">${G.seaSvg(d, `海の断面。水深${d}m`)}</div>
-      <p class="big" id="labv" role="status" aria-live="polite">水深${d}m → 時速約${G.kmhStr(v)}km<br><small>100mを約${G.secStr(G.sec100(d))}秒</small></p>
-      <div class="labin"><label for="depth">海の深さ（水深）</label><input type="range" id="depth" min="0" max="${PLAY_D.length - 1}" step="1" value="${i}" aria-valuetext="水深${d}m"></div>
-      <div class="row" style="padding:0 .7rem .8rem"><button class="sub" id="dm" aria-label="浅くする"${i <= 0 ? " disabled" : ""}>− 浅く</button><button class="sub" id="dp" aria-label="深くする"${i >= PLAY_D.length - 1 ? " disabled" : ""}>深く ＋</button></div>
+    <div class="ad act"><div class="sky" id="labsea"></div>
+      <p class="big" id="labv" role="status" aria-live="polite"></p>
+      <div class="labin"><label for="depth">海の深さ（水深）</label><input type="range" id="depth" min="0" max="${PLAY_D.length - 1}" step="1" value="${i}"></div>
+      <div class="row" style="padding:0 .7rem .8rem"><button class="sub" id="dm" aria-label="浅くする">− 浅く</button><button class="sub" id="dp" aria-label="深くする">深く ＋</button></div>
     </div>
-    <p class="note" style="text-align:left" id="labcmp">${slower.length ? `🌊 津波のほうが速い：${slower.map((m) => esc(m.name)).join("・")}` : ""}${even.length ? `<br>＝ ほぼ同じ：${even.map((m) => esc(m.name)).join("・")}` : ""}${faster.length ? `<br>津波より速い：${faster.map((m) => esc(m.name)).join("・")}` : ""}</p>
-    ${ruler(d, null, "物差し：海の深さと速さ", "（いまの深さ）")}
+    <p class="note" style="text-align:left" id="labcmp"></p>
+    <div id="labruler"></div>
     ${footer()}`;
+  // つまみ・ボタンは作り直さず、表示だけを替える（つまみを作り直すと、ドラッグの途中で動かなくなる。PR #1 の CodeRabbit）
+  const show = (j) => {
+    i = Math.max(0, Math.min(PLAY_D.length - 1, j));
+    const d = PLAY_D[i], v = G.kmh(d), slower = G.MOVERS.filter((m) => m.v * 1.1 < v), faster = G.MOVERS.filter((m) => m.v > v * 1.1), even = G.MOVERS.filter((m) => !slower.includes(m) && !faster.includes(m));
+    const r = $("depth"); if (+r.value !== i) r.value = String(i); r.setAttribute("aria-valuetext", `水深${d}m`);
+    $("dm").disabled = i <= 0; $("dp").disabled = i >= PLAY_D.length - 1;
+    $("labsea").innerHTML = G.seaSvg(d, `海の断面。水深${d}m`);
+    $("labv").innerHTML = `水深${d}m → 時速約${G.kmhStr(v)}km<br><small>100mを約${G.secStr(G.sec100(d))}秒</small>`;
+    $("labcmp").innerHTML = [slower.length ? `🌊 津波のほうが速い：${slower.map((m) => esc(m.name)).join("・")}` : "", even.length ? `＝ ほぼ同じ：${even.map((m) => esc(m.name)).join("・")}` : "", faster.length ? `津波より速い：${faster.map((m) => esc(m.name)).join("・")}` : ""].filter(Boolean).join("<br>");
+    $("labruler").innerHTML = ruler(d, null, "物差し：海の深さと速さ", "（いまの深さ）");
+  };
   $("back").onclick = home;
-  $("depth").oninput = (e) => { lab(+e.target.value); const r = $("depth"); if (r) r.focus(); };
-  $("dm").onclick = () => { lab(i - 1); const b = $("dm"); if (b && !b.disabled) b.focus(); };
-  $("dp").onclick = () => { lab(i + 1); const b = $("dp"); if (b && !b.disabled) b.focus(); };
-  bindFooter();
+  $("depth").oninput = (e) => show(+e.target.value);
+  $("dm").onclick = () => show(i - 1);
+  $("dp").onclick = () => show(i + 1);
+  show(i);
+  bindFooter(); toTop();
 }
 // 出どころと、くわしく調べる所を書く
 function about() {

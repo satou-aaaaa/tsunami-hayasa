@@ -11,6 +11,7 @@ import path from "node:path";
 import { checkTransfer } from "./transfer-check.mjs";
 import { checkSwStall } from "./sw-check.mjs";
 import { checkDepth } from "./depth-check.mjs";
+import { checkCore } from "./core-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const results = [];
@@ -311,6 +312,10 @@ try {
     const t10 = await p.textContent("#labv");
     check("深さを変えてくらべる：はじめは水深10mで時速約36km・100mを約10秒・物差しが出る", /水深10m/.test(t10) && /時速約36km/.test(t10) && /100mを約10秒/.test(t10) && await p.locator("#ruler li.me").count() === 1 && (await p.textContent("#labcmp")).includes("短距離走のトップ選手"));
     await p.click("#dp"); const t15 = await p.textContent("#labv");
+    const knob = await p.$("#depth"), box = await knob.boundingBox();
+    await p.mouse.move(box.x + 4, box.y + box.height / 2); await p.mouse.down(); await p.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2, { steps: 4 }); await p.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2, { steps: 4 }); await p.mouse.up();
+    const dragged = await p.evaluate((e) => ({ alive: e.isConnected, v: +e.value }), knob);
+    check("深さを変えてくらべる：つまみをドラッグし続けても同じつまみのまま深さが変わり続ける（作り直さない。PR #1 の CodeRabbit）", dragged.alive && dragged.v >= Math.round(0.7 * 25) && (await p.textContent("#labv")).includes(`水深${[1, 2, 3, 5, 7, 10, 15, 20, 30, 50, 70, 100, 150, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000][dragged.v]}m`), JSON.stringify(dragged));
     await p.focus("#depth"); await p.keyboard.press("End"); await p.waitForTimeout(50); const tend = await p.textContent("#labv");
     check("深さを変えてくらべる：「深く」とキーボード（End）で水深が変わり、8000mで時速約1010km", /水深15m/.test(t15) && /水深8000m/.test(tend) && /時速約1010km/.test(tend) && await p.locator("#dp:disabled").count() === 1, `${t15} / ${tend}`);
     check("深さを変えてくらべる：押す所は44px以上・記録を増やさない", (await p.$$eval("#dm, #dp, #depth", (b) => b.every((x) => Math.round(x.getBoundingClientRect().height) >= 44))) && JSON.stringify(await mem(p)) === before);
@@ -556,6 +561,11 @@ try {
   await q.close(); }
 { const bad = G.KINDS.filter((k) => { for (let i = 0; i < 200; i++) { const P = G.make(`${k.id}|g${i}`); if (k.d ? !G.GROUPS[P.grp] : P.grp) return true; } return false; }).map((k) => k.id), used = new Set(G.KINDS.map((k) => k.grp).filter(Boolean));
   check("2段目「100mを何秒で進む？」：くらべ・深さあての問題はどれも4つのどれかで、4つとも使う。決まりの問題には2段目が無い", bad.length === 0 && Object.keys(G.GROUPS).join() === "b20,b8,b2,b0" && used.size === 4, bad.join(",")); }
+// 共通部品 game-core（shared-workflows template/qa/core-check.mjs）：はじめての練習の吹き出し・？遊び方・感想・不具合の帯（PR #1 の CodeRabbit）
+// first: false・solve なし：吹き出しの1つ目で「やってみる」を押すと、2つ目（答えたあとの「次へ」）を待つあいだ吹き出しの箱が hidden になるが、
+// core-check の「やってみる」を押す輪は箱でなくボタンの hidden だけを見て、見えないボタンを押そうとして30秒で止まる（ひな形の検査の見分けの問題。shared-workflows へ報告した）。
+// はじめての案内は、このファイルの「はじめて開くと遊び方が出る」「その場で『見た』が残る」で見る。直ったら first と solve を戻す
+try { await checkCore({ browser, url, check, first: false }); } catch (e) { check("game-core の検査が最後まで動く", false, e.message.split("\n")[0]); }
 // 引き継ぎコード（shared-workflows template/qa/transfer-check.mjs）
 try {
   const sample = { "tnhy-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-13": { m: [0, 1, 0, 0, 2], k: ["d100", "d500", "d200", "d10", "d20"] } }, hdays: {}, adays: {}, dex: { d100: 1, d10: 1, d200: 1, d2000: 1, d5000: 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "tnhy-fs": "3", "tnhy-depth": JSON.stringify({ v: 1, rv: { "d100|x1": { s: 1, due: "2026-11-20", t: 5 } } }) }; // 復習の記録も引き継ぐかを見る（CodeRabbit shindo-yomi#1）
